@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Shooting Game with Gradient Menu (Comfortaa)</title>
+
+  <!-- 1) Load Comfortaa font from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link 
+    href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;600&display=swap" 
+    rel="stylesheet"
+  >
+
+  <style>
+    /* 
+      Body: dark gradient background from #2f2f2f to #444444.
+      We use Comfortaa for all text.
+    */
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      background: linear-gradient(to right, #2f2f2f, #444444);
+      font-family: 'Comfortaa', sans-serif; /* Apply Comfortaa everywhere */
+      color: #ffffff;
+      overflow: hidden;
+      cursor: default; /* Show cursor on the menu so user can click "play" */
+    }
+
+    /* MAIN MENU OVERLAY */
+    #mainMenu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start; /* Align left to mimic your screenshot style */
+      padding-left: 50px;      /* Some left padding */
+      z-index: 20;
+      background: rgba(0, 0, 0, 0.7);
+    }
+
+    /* Big title text (light weight: 300) */
+    #mainMenu h1 {
+      font-size: 64px;
+      font-weight: 300;
+      margin: 0 0 40px 0;
+    }
+
+    /* Menu container for "play" link */
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Single "play" link */
+    .menu a {
+      font-size: 24px;
+      text-decoration: none;
+      color: #dddddd;
+      transition: color 0.2s ease;
+      cursor: pointer;
+      font-weight: 400; /* Normal weight for link text */
+    }
+
+    .menu a:hover {
+      color: #ffffff;
+    }
+
+    /* GAME AREA (hidden until user clicks "play") */
+    #gameArea {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: none; 
+      background: #000; /* Pure black behind the shooting game */
+    }
+
+    /* The bright color band in the center */
+    #background {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 30%;
+      background: linear-gradient(to top, #ff0099, #ffcc00);
+      transform: translateY(-50%);
+      border-top: 15px solid black;
+      border-bottom: 15px solid black;
+    }
+
+    /* Crosshair */
+    #crosshair {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+
+    /* Gun container */
+    #gunContainer {
+      position: absolute;
+      bottom: 0;
+      z-index: 5;
+      width: 500px;
+      height: auto;
+      cursor: pointer;
+    }
+
+    /* Gun image */
+    #gun {
+      width: 100%;
+      display: block;
+    }
+
+    /* Score and Highscore styling (using weight 600 for a bit bolder) */
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 32px;
+      font-weight: 600;
+      color: white;
+      transition: color 0.3s ease, transform 0.3s ease;
+    }
+    #score:hover {
+      transform: scale(1.2);
+      color: #FFCC00;
+    }
+
+    #highscore {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 32px;
+      font-weight: 600;
+      color: white;
+      transition: color 0.3s ease, transform 0.3s ease;
+    }
+
+    /* Notification element */
+    #notification {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      font-weight: 600;
+      color: lime;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      z-index: 15;
+    }
+
+    .enemy, .newEnemy {
+      position: absolute;
+      width: 120px;
+      height: 160px;
+      transition: background-color 0.3s ease;
+      z-index: 1;
+      /* Hide the pointer over enemies */
+      cursor: none !important;
+    }
+
+    .newEnemy {
+      width: 150px;
+      height: 200px;
+    }
+
+    .enemy:hover, .newEnemy:hover {
+      background-color: orange;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MAIN MENU OVERLAY -->
+  <div id="mainMenu">
+    <h1>made with notepad</h1>
+    <div class="menu">
+      <a id="playBtn">play</a>
+    </div>
+  </div>
+
+  <!-- GAME AREA -->
+  <div id="gameArea">
+    <div id="background"></div>
+    <div id="score">Kills: 0</div>
+    <div id="highscore">Highscore: 0</div>
+    <div id="notification"></div>
+    <img id="crosshair" src="https://imgur.com/ysdCw78.png" alt="Crosshair">
+    
+    <!-- Gun container holding the gun image -->
+    <div id="gunContainer">
+      <img id="gun" src="https://imgur.com/foRW7OA.png" alt="Gun">
+    </div>
+    
+    <audio id="gunshot" src="https://www.fesliyanstudios.com/play-mp3/387" preload="auto"></audio> 
+  </div>
+
+  <script>
+    /* ------------- Game Variables ------------- */
+    let gameStarted = false;
+    let kills = 0;
+    let highscore = localStorage.getItem("highscore") ? parseInt(localStorage.getItem("highscore")) : 0;
+    let enemyCount = 1;
+    const maxEnemies = 3;
+    let baseSpeed = 3;
+    const maxSpeed = 20;
+
+    /* ------------- DOM Elements ------------- */
+    const mainMenu = document.getElementById('mainMenu');
+    const gameArea = document.getElementById('gameArea');
+    const gunshotSound = document.getElementById("gunshot");
+    const gun = document.getElementById("gun");
+    const gunContainer = document.getElementById("gunContainer");
+    const crosshair = document.getElementById("crosshair");
+    const scoreElem = document.getElementById("score");
+    const highscoreElem = document.getElementById("highscore");
+    const notification = document.getElementById("notification");
+
+    /* ------------- Gun Image Sources ------------- */
+    const defaultGunSrc = gun.src;
+    const shotGunSrc = "https://imgur.com/nEuGwDM.png"; // your "fired" gun image
+    const gunRightOffset = 270;
+
+    /* ------------- Notification Flag ------------- */
+    let notificationShown = false;
+
+    /* ------------- Initialize Highscore ------------- */
+    highscoreElem.innerText = "Highscore: " + highscore;
+
+    /* ------------- Menu Button ------------- */
+    document.getElementById("playBtn").addEventListener("click", startGame);
+
+    function startGame() {
+      // Hide the main menu
+      mainMenu.style.display = "none";
+      // Show the game area
+      gameArea.style.display = "block";
+      // Hide the cursor in the game
+      document.body.style.cursor = "none";
+      gameStarted = true;
+      spawnEnemies();
+    }
+
+    /* ------------- Mouse Movement ------------- */
+    document.addEventListener("mousemove", (e) => {
+      if (!gameStarted) return;
+      crosshair.style.left = `${e.clientX}px`;
+      crosshair.style.top = `${e.clientY}px`;
+
+      // Move the gun container so the gun stays aligned with the mouse
+      let gunPosition = e.clientX + gunRightOffset - gun.width / 2;
+      gunContainer.style.left = `${gunPosition}px`;
+    });
+
+    /* ------------- Firing Gun ------------- */
+    document.addEventListener("mousedown", () => {
+      if (!gameStarted) return;
+      gunshotSound.currentTime = 0;
+      gunshotSound.play();
+      fireGun();
+    });
+
+    function fireGun() {
+      gun.src = shotGunSrc;
+      // Revert after 1 second
+      setTimeout(() => {
+        gun.src = defaultGunSrc;
+      }, 1000);
+    }
+
+    /* ------------- Spawning Enemies ------------- */
+    function spawnEnemies() {
+      if (!gameStarted) return;
+
+      const currentEnemyCount = document.querySelectorAll('.enemy, .newEnemy').length;
+      if (currentEnemyCount < maxEnemies) {
+        for (let i = currentEnemyCount; i < maxEnemies; i++) {
+          let enemyType = Math.random() < 0.5 ? "enemy" : "newEnemy";
+          let enemy = document.createElement("img");
+          enemy.classList.add(enemyType);
+          enemy.src = "https://imgur.com/O0mOV5s.png"; // enemy image
+          gameArea.appendChild(enemy);
+
+          let spawnSide = Math.random() < 0.5 ? "left" : "right";
+          enemy.style.top = "45%";
+
+          if (spawnSide === "left") {
+            let positionLeft = Math.random() * (window.innerWidth / 2 - 500);
+            enemy.style.left = `${positionLeft}px`;
+          } else {
+            let positionRight = Math.random() * (window.innerWidth / 2 - 500);
+            enemy.style.right = `${positionRight}px`;
+          }
+
+          let speed = baseSpeed + kills; 
+          if (speed > maxSpeed) speed = maxSpeed;
+
+          let moveInterval = setInterval(() => {
+            let currentPos = parseInt(enemy.style[spawnSide]) || 0;
+            if (currentPos >= window.innerWidth) {
+              clearInterval(moveInterval);
+              enemy.remove();
+              spawnEnemies();
+            } else {
+              enemy.style[spawnSide] = `${currentPos + speed}px`;
+            }
+          }, 30);
+
+          // Clicking on the enemy
+          enemy.addEventListener("click", () => {
+            // Gun sound
+            gunshotSound.currentTime = 0;
+            gunshotSound.play();
+            // Increase kills
+            kills++;
+            updateKillColor();
+            scoreElem.innerText = "Kills: " + kills;
+
+            // Check highscore
+            if (kills > highscore) {
+              highscore = kills;
+              localStorage.setItem("highscore", highscore);
+              highscoreElem.innerText = "Highscore: " + highscore;
+              updateHighscoreColor();
+
+              if (!notificationShown) {
+                notification.innerText = "New Highscore!";
+                notification.style.opacity = 1;
+                setTimeout(() => { notification.style.opacity = 0; }, 1000);
+                notificationShown = true;
+              }
+            }
+
+            clearInterval(moveInterval);
+            enemy.remove();
+            spawnEnemies();
+          });
+        }
+      }
+    }
+
+    /* ------------- Animate Kill Counter ------------- */
+    function updateKillColor() {
+      if (kills < 10) {
+        scoreElem.style.color = 'white';
+      } else if (kills < 20) {
+        scoreElem.style.color = 'orange';
+      } else {
+        scoreElem.style.color = 'yellow';
+      }
+      scoreElem.style.transform = 'scale(1.5)';
+      setTimeout(() => { scoreElem.style.color = 'white'; }, 1000);
+      setTimeout(() => { scoreElem.style.transform = 'scale(1)'; }, 500);
+    }
+
+    /* ------------- Animate Highscore Counter ------------- */
+    function updateHighscoreColor() {
+      if (highscore < 10) {
+        highscoreElem.style.color = 'white';
+      } else if (highscore < 20) {
+        highscoreElem.style.color = 'orange';
+      } else {
+        highscoreElem.style.color = 'yellow';
+      }
+      highscoreElem.style.transform = 'scale(1.5)';
+      setTimeout(() => { highscoreElem.style.color = 'white'; }, 1000);
+      setTimeout(() => { highscoreElem.style.transform = 'scale(1)'; }, 500);
+    }
+
+    /* ------------- Increase Enemy Count Over Time ------------- */
+    setInterval(() => {
+      if (gameStarted && kills >= 5 * enemyCount && enemyCount < maxEnemies) {
+        enemyCount++;
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
